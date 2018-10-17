@@ -1,0 +1,67 @@
+//add following lines to short-tail template
+//see "SET UP" comments, where modification of initial settting is needed.
+
+<div id="otherAleph-el" ></div> <!--elemenet for inserting info and link to remote OPAC, place it anywhere by your requirements -->
+
+<script type="text/javascript">
+//Following methods "sklonovani Cisla" are constructed for declination of terms after numerals in the Czech language. 
+//For other languages it can be ommited or must be modified
+//   1st argument is for singular, number 1  (p.e. "zaznam", "exemplar")
+//   2nd argument is for numbers 2,3,4, when following term is an accusative (p.e. "zaznamy", "exemplare")
+//   3rd argument is for numbers 5 or more, and zero, when following term is in genitive (p.e. "zaznamu", "exemplaru")
+Number.prototype.sklonovaniCisla=function(tvar1, tvar2_4, tvar05_ ) {
+   var dolar=String.fromCharCode(36);
+   for ( var i=0; i<arguments.length; i++) { if (typeof  arguments[i] == 'undefined' ) arguments[i]=''; }
+   return this.toString().replace(new RegExp('^([\-]*1)'+dolar),dolar+'1 '+tvar1).replace(new RegExp('^([\-]*[234]{1})'+dolar),dolar+'1 '+tvar2_4).replace(new RegExp('^([\-]*[056789]{1}[0-9]*)'+dolar),dolar+'1 '+tvar05_).replace(new RegExp('^([\-]*[1234]{1}[0-9]+)'+dolar),dolar+'1 '+tvar05_).replace(new RegExp('^([\-]*[0-9]+)[\.,]{1}([0-9]+)'+dolar),dolar+'1,'+dolar+'2 '+tvar05_);
+   }
+//the same, when declination is made on variable type string
+String.prototype.sklonovaniCisla=function(tvar1, tvar2_4, tvar05_ ) {
+   if ( parseFloat(this) ) { return parseFloat(this).sklonovaniCisla(tvar1, tvar2_4, tvar05_); }
+   else { console.log ('sklonovaniCisla error: '+this+' is not a number'); return this;}
+   }
+
+//main function for calling rteemote X-Server and displaying results
+function remoteAlephApi  (target_request) {
+   var target_cat="aleph.library.home"; //SET UP - DNS of remote Aleph
+   var target_base="CATALOGUE";  //SET UP - Aleph base to be searched in remote system
+   var redir_cgi="/cgi-bin/redir.cgi?redd=";  //SET UP if you will use redirection through home Aleph server 
+      // (if access to remote X-server is not fully ope to internet)
+      // URL relative path to your CGI scripts, where here including redir.cgi will be stored.
+   //SET UP texts to be displayed to user when some records have been found in the remote catalogue. In this example, the remote libary logo stored in www_f_lng/icon is also included
+   var target_show_text="See also catalogue of <img src=\"&icon_path/library-logo.gif \" border=\"0\">Some Remote Library";
+        var Tzaznam=new Array('record','records','records'); var Tnajdete=' found in ';}
+   //following example is in the Czech language:
+   //var target_show_text=" katalogu <img src=\"&icon_path/knihovna-logo.gif\" border=\"0\">Jiné knihovny ";
+        //var Tzaznam=new Array('záznam','záznamy','záznamů'); var Tnajdete=' najdete v ';}
+        
+   target_request = encodeURIComponent(target_request.replace(/&quot;/g,"\""));
+   var xmlDoc=0;
+   if ( target_request.indexOf('=SET%3D')==-1 ) { //do not query remote Aleph for filtering queries that reffer to previous searches
+      var ht_request = createXMLHttpRequest();
+       if (ht_request != null) {
+       if ( redir_cgi != '' ) {var htxml_uri = redir_cgi+encodeURIComponent(window.location.protocol+'//'+target_cat+'/X/?op=find&request='+target_request+'&b'+'ase='+target_base);}
+       else {var htxml_uri = window.location.protocol+'//'+target_cat+'/X/?op=find&request='+target_request+'&b'+'ase='+target_base;}
+       ht_request.open('GET',htxml_uri,true);
+       ht_request.send();
+       ht_request.onreadystatechange=function () {
+         if(ht_request.readyState==4 && ht_request.status==200 ) {
+         var htResp =  ht_request.responseText;
+         if (window.DOMParser) { var parser=new DOMParser();  var htXresp = parser.parseFromString(htResp,"text/xml");}
+         else { var htXresp=new ActiveXObject("Microsoft.XMLDOM"); htXresp.async=false; htXresp.loadXML(htResp);}
+         if ( htXresp.getElementsByTagName('error').length > 0 )  { console.log ('Jiny Aleph Katalog X-Server API '+htxml_uri+' ERROR   '+htXresp.getElementsByTagName('error')[0].childNodes[0].nodeValue ); document.getElementById('otherAleph-el').style.display='none'; return null;}
+         if ( htXresp.getElementsByTagName('no_records').length==0 ) { console.log ('Jiny Aleph Katalog X-Server API '+edsApiBack+' ERROR - no_records element missing in response' ); document.getElementById('otherAleph-el').style.display='none'; return null;}
+         var jinyAlephHits = htXresp.getElementsByTagName('no_records')[0];
+         jinyAlephHits = parseInt(jinyAlephHits.childNodes[0].nodeValue);
+         if ( jinyAlephHits>0 && document.getElementById('otherAleph-el') ) {
+            document.getElementById('otherAleph-el').innerHTML = "<li>"+jinyAlephHits.sklonovaniCisla(Tzaznam[0],Tzaznam[1],Tzaznam[2]) + Tnajdete + "<a href=\""+ window.location.protocol +"//"+target_cat+"/F/?func=find-c&ccl_term="+target_request+"&local_base="+target_base+"\" target=\"_blank\">"+target_show_text+"</a></li>";
+            }
+         }
+       }
+      }
+     }
+   }
+
+//call main function with user query in Aleph placeholder
+remoteAlephApi ('$1100');
+
+</script>
